@@ -1,0 +1,93 @@
+
+AWSTemplateFormatVersion: 2010-09-09
+Description: SecurityGP Template
+
+Resources:
+  WEBSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: WEBSG
+      GroupName: WEBSG
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref ALBSG
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: WEBSG
+      VpcId: !ImportValue my-VpcId
+  
+  DBSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: DBSG
+      GroupName: DBSG
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: DBSG
+      VpcId: !ImportValue my-VpcId
+
+  ALBSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: ALBSG
+      GroupName: ALBSG
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: ALBSG
+      VpcId: !ImportValue my-VpcId
+
+  # Secrets Manager
+  RDSSecret: 
+    Type: "AWS::SecretsManager::Secret"
+    Properties:
+      Name: "RDSSecret"
+      Description: "RDS password for my RDS instance"
+      GenerateSecretString:
+        SecretStringTemplate: '{"username": "admin"}'
+        GenerateStringKey: "password"
+        PasswordLength: 16
+        ExcludeCharacters: '"@/\"[]*?!'
+
+
+
+# Outputs
+Outputs:
+  WEBSG:
+    Value: !Ref WEBSG
+    Export:
+      Name: WEBSGId
+
+  DBSG:
+    Value: !Ref DBSG
+    Export:
+      Name: DBSGId
+
+  ALBSG:
+    Value: !Ref ALBSG
+    Export:
+      Name: ALBSGId
+
+  RDSSecretArn:
+    Value: !Ref RDSSecret
+    Export:
+      Name: RDSSecretArn

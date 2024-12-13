@@ -1,0 +1,180 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: VPC Template
+
+Metadata: 
+  "AWS::CloudFormation::Interface": 
+    ParameterGroups: 
+      - Label: 
+          default: "Network Configuration"
+        Parameters: 
+          - VPCCIDR
+          - PubricSubnet1aCIDR
+          - PublicSubnet1cCIDR
+          - PrivateSubnet1aCIDR
+          - PrivateSubnet1cCIDR
+
+Parameters:
+
+  VPCCIDR:
+    Type: String
+    Default: "172.31.0.0/16"
+
+  PubricSubnet1aCIDR:
+    Type: String
+    Default: "172.31.0.0/24"
+
+  PublicSubnet1cCIDR:
+    Type: String
+    Default: "172.31.1.0/24"
+
+  PrivateSubnet1aCIDR:
+    Type: String
+    Default: "172.31.2.0/24"
+
+  PrivateSubnet1cCIDR:
+    Type: String
+    Default: "172.31.3.0/24"
+
+
+#----------#
+#Resources
+#----------#
+
+#VPC
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VPCCIDR
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: my-VPC
+
+# Subnet
+  PublicSubnet1a:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: "ap-northeast-1a"
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PubricSubnet1aCIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: my-PubricSubnet1a
+  
+  PrivateSubnet1a:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: "ap-northeast-1a"
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PrivateSubnet1aCIDR
+      Tags:
+        - Key: Name
+          Value: my-PrivateSubnet1a
+
+  PublicSubnet1c:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: "ap-northeast-1c"
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PublicSubnet1cCIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: my-PublicSubnet1c
+  
+  PrivateSubnet1c:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: "ap-northeast-1c"
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PrivateSubnet1cCIDR
+      Tags:
+        - Key: Name
+          Value: my-PrivateSubnet1c
+
+# InternetGatewayとRouteTableを作成
+  IGW:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: my-IGW
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref IGW
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: my-PublicRouteTable
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: my-PrivateRouteTable
+
+# SubnetとRoutetableの関連付け
+  PublicRouteTableAssociation1a:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties:
+        RouteTableId: !Ref PublicRouteTable
+        SubnetId: !Ref PublicSubnet1a
+  PublicRouteTableAssociation1c:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties:
+        RouteTableId: !Ref PublicRouteTable
+        SubnetId: !Ref PublicSubnet1c
+  PrivateRouteTableAssociation1a:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties:
+        RouteTableId: !Ref PrivateRouteTable
+        SubnetId: !Ref PrivateSubnet1a
+  PrivateRouteTableAssociation1c:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties:
+        RouteTableId: !Ref PrivateRouteTable
+        SubnetId: !Ref PrivateSubnet1c
+
+# Routeの指定
+  PublicRoute:
+      Type: AWS::EC2::Route
+      Properties:
+        DestinationCidrBlock: 0.0.0.0/0
+        RouteTableId: !Ref PublicRouteTable
+        GatewayId: !Ref IGW
+
+
+#------------#
+#Outputs
+#------------#
+
+Outputs:
+  VPC:
+    Value: !Ref VPC
+    Export:
+      Name: my-VpcId
+  PublicSubnet1a:
+    Value: !Ref PublicSubnet1a
+    Export:
+      Name: my-PublicSubnet1aId
+  PublicSubnet1c:
+    Value: !Ref PublicSubnet1c
+    Export:
+      Name: my-PublicSubnet1cId
+  PrivateSubnet1a:
+    Value: !Ref PrivateSubnet1a
+    Export:
+      Name: my-PrivateSubnet1aId
+  PrivateSubnet1c:
+    Value: !Ref PrivateSubnet1c
+    Export:
+      Name: my-PrivateSubnet1cId

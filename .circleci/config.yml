@@ -1,0 +1,47 @@
+---
+version: 2.1
+
+# CircleCIでの設定やジョブを簡単に再利用可能にするためのモジュール
+orbs: 
+  aws-cli: circleci/aws-cli@5.1.1
+  ansible-playbook: orbss/ansible-playbook@0.0.5
+
+# circleci上で実行させる内容を定義
+jobs:
+  Create-Stack-Cloudformation:
+    executor: aws-cli/default                              #Circleciで実行するテストやデプロイを動かすための環境
+    steps:
+      - checkout                                           #Circleciの実行環境にGitリポジトリをpull
+      - aws-cli/setup:                                     #AWSアカウントの認証
+          aws_access_key_id: AWS_ACCESS_KEY_ID
+          aws_secret_access_key: AWS_SECRET_ACCESS_KEY
+          region: AWS_DEFAULT_REGION
+      - run:                                               #cloudformationのデプロイ
+          name: Deploy Cloudformation
+          command: |                                       
+            set -x                                         
+            aws cloudformation deploy --template-file cloudformation/Network.yml --stack-name VPC-Subnets
+            aws cloudformation deploy --template-file cloudformation/SecurityGroups.yml --stack-name SecurityGroups
+            aws cloudformation deploy --template-file cloudformation/Resorces.yml --stack-name Resoures
+  
+  Run-ansible:
+    executor: ansible-playbook/default
+    steps:
+      - checkout
+      - add_ssh_keys:                                       #実行環境に公開鍵を追加
+          fingerprints:
+            - ${SSH_KEYS}
+      - ansible-playbook/install:                           #ansibleのインストール
+          version: ''
+      - ansible-playbook/playbook:                          
+          playbook: ansible/playbook.yml                    #実行するplaybookの指定
+          playbook-options: '-i ansible/inventory'          #インベントリファイルの指定
+
+workflows:                                                  # ジョブの集まりとその実行順序の定義
+  version: 2
+  Provisioning:
+    jobs:
+      - Create-Stack-Cloudformation
+      - Run-ansible:
+          requires:
+            - Create-Stack-Cloudformation       

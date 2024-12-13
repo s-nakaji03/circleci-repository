@@ -1,0 +1,93 @@
+- name: Unarchive a file of Tomcat
+  ansible.builtin.unarchive:
+    src: '{{ JDK }}'
+    dest: /opt
+    remote_src: yes
+
+- name: Add PATH to .bashrc
+  become: yes
+  ansible.builtin.lineinfile:
+    path: /home/ec2-user/.bashrc
+    regexp: '^export PATH=.*'
+    line: "export PATH=$PATH:/opt/{{ JDKPASS }}/bin"
+    insertafter: EOF
+
+- name: Add Tomcat User
+  ansible.builtin.user:
+    name: tomcat
+    comment: tomcat user
+    shell: /sbin/nologin
+
+- name: Unarchive a file of Tomcat
+  ansible.builtin.unarchive:
+    src: '{{ TOMCAT }}'
+    dest: /usr/local
+    remote_src: yes
+
+- name: Give insecure permissions to an existing file
+  ansible.builtin.file:
+    path: /usr/local/apache-tomcat-9.0.97
+    owner: tomcat
+    group: tomcat
+    recurse: yes
+
+- name: Create a symbolic link
+  ansible.builtin.file:
+    src: /usr/local/apache-tomcat-9.0.97
+    dest: /usr/local/tomcat
+    owner: tomcat
+    group: tomcat
+    state: link
+
+- name: Give insecure permissions to an existing file
+  ansible.builtin.file:
+    path: /usr/local/tomcat
+    owner: tomcat
+    group: tomcat
+    follow: yes
+
+- name: Create setenv.sh
+  become: yes
+  ansible.builtin.template:
+    src: templates/setenv.j2
+    dest: /usr/local/tomcat/bin/setenv.sh
+
+- name: Create Unit
+  become: yes
+  ansible.builtin.template:
+    src: templates/unit.j2
+    dest: /etc/systemd/system/tomcat.service
+
+- name: Change permission
+  become: yes
+  ansible.builtin.file:
+    path: /etc/systemd/system/tomcat.service
+    mode: '0755'
+
+- name: Start tomcat
+  become: yes
+  ansible.builtin.systemd:
+    state: started
+    name: tomcat
+
+- name: Install apache
+  become: yes
+  ansible.builtin.dnf:
+    name: httpd
+    state: latest
+
+- name: Add ProxyPass and ProxyPassReverse to apache config
+  become: yes
+  ansible.builtin.blockinfile:
+    path: /etc/httpd/conf/httpd.conf
+    block: |
+      ProxyPass / http://localhost:8080/
+      ProxyPassReverse / http://localhost:8080/
+    insertafter: EOF
+
+- name: Make sure a service unit is running
+  become: yes
+  ansible.builtin.systemd:
+    state: restarted
+    name: httpd
+

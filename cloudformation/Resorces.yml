@@ -1,0 +1,157 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Resources Template
+
+#---------------------#
+#-----パラメータ指定----#
+#---------------------#
+
+Parameters:
+  InstanceType:
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+      - t2.micro
+      - m1.small
+      - m1.large
+  DBInstanceType:
+    Type: String
+    Default: db.t3.micro
+    AllowedValues:
+      - db.t3.micro
+      - db.t2.small
+      - db.t2.medium
+
+#---------------------#
+#------リソース作成-----#
+#---------------------#
+
+
+# EC2:1
+Resources:
+  WEB1EC2:
+    Type: AWS::EC2::Instance
+    Properties:
+      NetworkInterfaces:
+        - SubnetId: !ImportValue my-PublicSubnet1aId
+          GroupSet:
+            - !ImportValue WEBSGId
+          DeviceIndex: 0
+      InstanceType: !Ref InstanceType
+      ImageId: !Sub "{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}"
+      Tags:
+        - Key: Name
+          Value: WEB1EC2
+      KeyName: mylinuxkeypairs
+
+# EC2:2
+
+  WEB2EC2:
+    Type: AWS::EC2::Instance
+    Properties:
+      NetworkInterfaces:
+        - SubnetId: !ImportValue my-PublicSubnet1cId
+          GroupSet:
+            - !ImportValue WEBSGId
+          DeviceIndex: 0
+      InstanceType: !Ref InstanceType
+      ImageId: !Sub "{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}"
+      Tags:
+        - Key: Name
+          Value: WEB2EC2
+      KeyName: mylinuxkeypairs
+
+#EIP1
+  MyEIPAssociation1:
+    Type: "AWS::EC2::EIPAssociation"
+    Properties:
+      AllocationId: eipalloc-02378df53ab69f44b # 既存のEIPアドレスを指定
+      InstanceId: !Ref WEB1EC2
+
+
+#EIP2
+  MyEIPAssociation2:
+    Type: "AWS::EC2::EIPAssociation"
+    Properties:
+      AllocationId: eipalloc-0f6cff4d32e289b91 # 既存のEIPアドレスを指定
+      InstanceId: !Ref WEB2EC2
+
+
+
+# RDS
+  RDS:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceIdentifier: "DBRDS"
+      AllocatedStorage : 20
+      DBInstanceClass: !Ref DBInstanceType
+      Port: 3306
+      StorageType: gp2
+      BackupRetentionPeriod: 1
+      MasterUsername: admin
+      MasterUserPassword: !Join 
+        - "" 
+        - - "{{resolve:secretsmanager:"
+          - !ImportValue RDSSecretArn
+          - ":SecretString:password}}"
+      DBName: DBmariadb
+      Engine: mariadb
+      EngineVersion: 10.11.9
+      DBSubnetGroupName: !Ref DBSubnetgroup
+      MultiAZ: false
+      VPCSecurityGroups:
+        - !ImportValue DBSGId
+
+  DBSubnetgroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: "My RDS Subnet Group"
+      DBSubnetGroupName: DBSubnetgroup
+      SubnetIds:
+        - !ImportValue my-PrivateSubnet1aId
+        - !ImportValue my-PrivateSubnet1cId
+
+# ALB
+  ALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      IpAddressType: ipv4
+      Name: ALB
+      Scheme: internet-facing
+      SecurityGroups:
+        - !ImportValue ALBSGId
+      Subnets:
+        - !ImportValue my-PublicSubnet1aId
+        - !ImportValue my-PublicSubnet1cId
+      Tags:
+        - Key: Name
+          Value: ALB
+
+# ALBのターゲットグループの指定
+  ALBTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: ALBTargetGroup
+      Port: 80
+      Protocol: HTTP
+      Targets:
+        - Id: !Ref WEB1EC2
+        - Id: !Ref WEB2EC2
+      VpcId: !ImportValue my-VpcId
+
+
+# ALBのリスナーの指定
+  ALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn:
+            !Ref ALBTargetGroup
+      LoadBalancerArn:
+        !Ref ALB
+      Port: 80
+      Protocol: HTTP
+
+
+
+
