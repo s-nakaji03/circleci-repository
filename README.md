@@ -1,4 +1,4 @@
 # circleci-repository
 
 # 構成図
-![1](picture/1.png)
+![1](pictures/1.png)
