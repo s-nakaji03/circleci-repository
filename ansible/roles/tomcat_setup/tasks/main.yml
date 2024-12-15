@@ -26,14 +26,14 @@
 
 - name: Give insecure permissions to an existing file
   ansible.builtin.file:
-    path: /usr/local/apache-tomcat-9.0.97
+    path: /usr/local/apache-tomcat-9.0.98
     owner: tomcat
     group: tomcat
     recurse: yes
 
 - name: Create a symbolic link
   ansible.builtin.file:
-    src: /usr/local/apache-tomcat-9.0.97
+    src: /usr/local/apache-tomcat-9.0.98
     dest: /usr/local/tomcat
     owner: tomcat
     group: tomcat
